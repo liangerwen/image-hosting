@@ -20,7 +20,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import useConfigModal, { Config } from "@/hooks/use-config-modal";
 import { Octokit } from "octokit";
-import { getBase64 } from "@/lib/utils";
 import PopoverConfirm from "@/components/popover-confirm";
 
 type ToArray<T> = T extends any[] ? T : T[];
@@ -70,15 +69,21 @@ export default function Home() {
     if (!octokit || !userRef.current || !config) return;
     await Promise.all(
       files.map(async (f) => {
-        const sha = processed.find((file) => file.name === f.name)?.sha;
+        const formData = new FormData();
+        formData.append("file", f);
+        const res = await fetch("/api/compress", {
+          method: "post",
+          body: formData,
+        });
+        const base64 = await res.json();
+        const filename = f.name.split(".").shift();
         const { data } = await octokit.rest.repos.createOrUpdateFileContents({
           owner: userRef.current!.login,
           repo: config.repo,
-          path: `${PATH}/${Date.now()}-${f.name}`,
-          message: `feat: upload ${f.name}`,
-          content: await getBase64(f),
+          path: `${PATH}/${Date.now()}-${filename}.webp`,
+          message: `feat: upload ${filename}`,
+          content: base64,
           mediaType: { format: "base64" },
-          sha,
         });
         return data;
       })
@@ -110,7 +115,9 @@ export default function Home() {
       <FileUpload
         className="w-full"
         value={files}
-        onValueChange={setFiles}
+        onValueChange={(f) => {
+          setFiles(f);
+        }}
         onFileReject={onFileReject}
         multiple
         accept="image/*"
@@ -158,7 +165,7 @@ export default function Home() {
             )}
           </div>
           <div className="flex gap-2">
-            <Button onClick={uploadFileToGitHub}>上传</Button>
+            <Button onClick={uploadFileToGitHub}>压缩并上传</Button>
             <Button variant="outline" onClick={() => openModal()}>
               设置
             </Button>
@@ -182,7 +189,7 @@ export default function Home() {
                         onClick={() => window.open(URL.createObjectURL(file))}
                       />
                       <FileUploadItemMetadata />
-                      <Badge>等待上传...</Badge>
+                      <Badge>等待上传</Badge>
                       <FileUploadItemDelete asChild>
                         <Button variant="ghost" size="icon" className="size-7">
                           <X />
