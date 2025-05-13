@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   FileUpload,
@@ -12,22 +12,34 @@ import {
   FileUploadList,
   formatBytes,
 } from "@/components/ui/file-upload";
+import { useLocalStorage } from "react-use";
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Github, SquareMousePointer, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import useConfigModal, { Config } from "@/hooks/use-config-modal";
 import { Octokit } from "octokit";
+import { getBase64 } from "@/lib/utils";
+import PopoverConfirm from "@/components/popover-confirm";
 
 type ToArray<T> = T extends any[] ? T : T[];
 type RepoFiles = ToArray<
   Awaited<ReturnType<Octokit["rest"]["repos"]["getContent"]>>["data"]
 >;
 
+type User = Awaited<
+  ReturnType<Octokit["rest"]["users"]["getAuthenticated"]>
+>["data"];
+
+const PATH = "images";
+
 export default function Home() {
   const [files, setFiles] = useState<File[]>([]);
   const [processed, setProcessed] = useState<RepoFiles>([]);
-  const [config, setConfig] = useState<Config>();
+  const [config, setConfig] = useLocalStorage<Config>("config");
+  const octokitRef = useRef<Octokit>(null);
+  const userRef = useRef<User>(null);
   const onFileReject = useCallback((file: File, message: string) => {
     toast(message, {
       description: `"${
@@ -36,31 +48,61 @@ export default function Home() {
     });
   }, []);
 
-  const [element, openModal] = useConfigModal({
-    onSubmit: (data) => {
-      setConfig(data);
-      getFiles(data);
-    },
+  const [element, openModal] = useConfigModal(config, {
+    onSubmit: setConfig,
   });
 
   const getFiles = async (data: Config) => {
-    const octokit = new Octokit({
-      // auth: "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",
-      auth: data.token,
-    });
-    const user = await octokit.rest.users.getAuthenticated();
+    const octokit = octokitRef.current;
+    if (!octokit || !userRef.current) return;
     const content = await octokit.rest.repos.getContent({
-      owner: user.data.login,
+      owner: userRef.current.login,
       repo: data.repo,
-      path: "public/images",
+      path: PATH,
     });
-    const res = await octokit.rest.repos.listForAuthenticatedUser({
-      visibility: "all",
-    });
-    console.log(res.data, "pxl");
     if (Array.isArray(content.data)) {
       setProcessed(content.data.filter((file) => file.type === "file"));
     }
+  };
+
+  async function uploadFileToGitHub() {
+    const octokit = octokitRef.current;
+    if (!octokit || !userRef.current || !config) return;
+    await Promise.all(
+      files.map(async (f) => {
+        const sha = processed.find((file) => file.name === f.name)?.sha;
+        const { data } = await octokit.rest.repos.createOrUpdateFileContents({
+          owner: userRef.current!.login,
+          repo: config.repo,
+          path: `${PATH}/${Date.now()}-${f.name}`,
+          message: `feat: upload ${f.name}`,
+          content: await getBase64(f),
+          mediaType: { format: "base64" },
+          sha,
+        });
+        return data;
+      })
+    );
+    setFiles([]);
+    getFiles(config);
+    toast.success("文件上传成功");
+  }
+
+  useEffect(() => {
+    if (config) {
+      (async () => {
+        octokitRef.current = new Octokit({
+          auth: config.token,
+        });
+        const user = await octokitRef.current.rest.users.getAuthenticated();
+        userRef.current = user.data;
+        getFiles(config);
+      })();
+    }
+  }, [JSON.stringify(config)]);
+
+  const getDisplayUrl = (name: string) => {
+    return `https://raw.githubusercontent.com/${userRef.current?.login}/${config?.repo}/main/${name}`;
   };
 
   return (
@@ -116,7 +158,7 @@ export default function Home() {
             )}
           </div>
           <div className="flex gap-2">
-            <Button>上传</Button>
+            <Button onClick={uploadFileToGitHub}>上传</Button>
             <Button variant="outline" onClick={() => openModal()}>
               设置
             </Button>
@@ -129,27 +171,31 @@ export default function Home() {
               <TabsTrigger value="processed">已上传</TabsTrigger>
             </TabsList>
             <TabsContent value="waiting">
-              <FileUploadList>
-                {files.map((file, index) => (
-                  <FileUploadItem key={index} value={file}>
-                    <FileUploadItemPreview
-                      className="cursor-pointer"
-                      onClick={() => window.open(URL.createObjectURL(file))}
-                    />
-                    <FileUploadItemMetadata />
-                    <Badge>压缩成功({formatBytes(22993242)})，等待上传</Badge>
-                    <FileUploadItemDelete asChild>
-                      <Button variant="ghost" size="icon" className="size-7">
-                        <X />
-                      </Button>
-                    </FileUploadItemDelete>
-                  </FileUploadItem>
-                ))}
-              </FileUploadList>
+              {files.length === 0 ? (
+                <div className="mx-auto mt-8 w-fit">请选择上传文件</div>
+              ) : (
+                <FileUploadList>
+                  {files.map((file, index) => (
+                    <FileUploadItem key={index} value={file}>
+                      <FileUploadItemPreview
+                        className="cursor-pointer"
+                        onClick={() => window.open(URL.createObjectURL(file))}
+                      />
+                      <FileUploadItemMetadata />
+                      <Badge>压缩成功({formatBytes(22993242)})，等待上传</Badge>
+                      <FileUploadItemDelete asChild>
+                        <Button variant="ghost" size="icon" className="size-7">
+                          <X />
+                        </Button>
+                      </FileUploadItemDelete>
+                    </FileUploadItem>
+                  ))}
+                </FileUploadList>
+              )}
             </TabsContent>
             <TabsContent value="processed">
               {processed.length === 0 ? (
-                <div>暂无上传记录</div>
+                <div className="mx-auto mt-8 w-fit">暂无上传记录</div>
               ) : (
                 <div className="data-[state=inactive]:fade-out-0 data-[state=active]:fade-in-0 data-[state=inactive]:slide-out-to-top-2 data-[state=active]:slide-in-from-top-2 flex flex-col gap-2 data-[state=active]:animate-in data-[state=inactive]:animate-out">
                   {processed.map((file) => (
@@ -159,14 +205,9 @@ export default function Home() {
                     >
                       <div className="relative flex size-10 shrink-0 items-center justify-center overflow-hidden rounded border bg-accent/50 [&>svg]:size-10">
                         <img
-                          src={file.download_url!}
+                          src={getDisplayUrl(file.path)}
                           alt={file.name}
                           className="size-full object-cover"
-                          onLoad={(event) => {
-                            if (!(event.target instanceof HTMLImageElement))
-                              return;
-                            URL.revokeObjectURL(event.target.src);
-                          }}
                         />
                       </div>
                       <div className="flex min-w-0 flex-1 flex-col">
@@ -181,13 +222,44 @@ export default function Home() {
                         variant="link"
                         onClick={() =>
                           navigator.clipboard
-                            .writeText(file.download_url!)
+                            .writeText(getDisplayUrl(file.path))
                             .then(() => toast.success("链接已复制到剪贴板"))
                             .catch(() => toast.error("复制失败，请手动复制"))
                         }
                       >
                         复制链接
                       </Button>
+                      <PopoverConfirm
+                        trigger={
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-7"
+                          >
+                            <X />
+                          </Button>
+                        }
+                        onConfirm={async () => {
+                          try {
+                            await octokitRef.current?.rest.repos.deleteFile({
+                              owner: userRef.current!.login,
+                              repo: config.repo,
+                              path: file.path,
+                              message: `feat: delete ${file.name}`,
+                              sha: file.sha,
+                            });
+                            toast.success("文件已删除");
+                            setProcessed(
+                              processed.filter((f) => f.sha !== file.sha)
+                            );
+                          } catch (e) {
+                            console.log(e);
+                            toast.error("删除失败，请稍后再试");
+                          }
+                        }}
+                      >
+                        确定删除这张图片吗？
+                      </PopoverConfirm>
                     </div>
                   ))}
                 </div>

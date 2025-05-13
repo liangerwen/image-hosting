@@ -12,7 +12,7 @@ import {
   FileVideoIcon,
 } from "lucide-react";
 import * as React from "react";
-import { MaskedImage } from "./masked-image";
+import { Button } from "./button";
 
 const ROOT_NAME = "FileUpload";
 const DROPZONE_NAME = "FileUploadDropzone";
@@ -1406,7 +1406,7 @@ const FileUploadClear = React.forwardRef<
 
   if (!shouldRender) return null;
 
-  const ClearPrimitive = asChild ? Slot : "button";
+  const ClearPrimitive = asChild ? Slot : Button;
 
   return (
     <ClearPrimitive

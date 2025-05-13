@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -33,6 +33,7 @@ import { RefreshCcw, TextSearch } from "lucide-react";
 import { Octokit } from "octokit";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useLocalStorage } from "react-use";
 
 export type Repos = Awaited<
   ReturnType<Octokit["rest"]["repos"]["listForAuthenticatedUser"]>
@@ -47,19 +48,23 @@ const formSchema = z.object({
 
 export type Config = z.infer<typeof formSchema>;
 
-const useConfigModal = ({
-  onSubmit,
-}: {
-  onSubmit?: (data: z.infer<typeof formSchema>) => void;
-} = {}) => {
+const useConfigModal = (
+  initialValue: Config,
+  {
+    onSubmit,
+  }: {
+    onSubmit?: (data: z.infer<typeof formSchema>) => void;
+  } = {}
+) => {
   const [open, setOpen] = useState(false);
-  const [repos, setRepos] = useState<Repos>([]);
+  const [repos, setRepos] = useLocalStorage<Repos>("repos", []);
   const [loading, setLoading] = useState(false);
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
+    defaultValues: initialValue,
   });
 
-  const getRepos = () => {
+  const getRepos = async () => {
     const { token } = form.getValues();
     if (!token) {
       return toast.error("请填写Token");
@@ -78,6 +83,10 @@ const useConfigModal = ({
     onSubmit?.(data);
     closeModal();
   };
+
+  useEffect(() => {
+    form.reset();
+  }, [JSON.stringify(initialValue)]);
 
   const element = (
     <AlertDialog open={open} onOpenChange={setOpen}>
@@ -128,7 +137,7 @@ const useConfigModal = ({
                         <SelectValue placeholder="请选择仓库" />
                       </SelectTrigger>
                       <SelectContent className="max-h-60">
-                        {repos.length === 0 ? (
+                        {repos!.length === 0 ? (
                           <div className="w-full h-36 flex justify-center items-center flex-col gap-1">
                             <TextSearch className="size-18" />
                             <div className="text-xs">
@@ -146,8 +155,8 @@ const useConfigModal = ({
                             </div>
                           </div>
                         ) : (
-                          repos.map((repo) => (
-                            <SelectItem value={repo.name}>
+                          repos!.map((repo) => (
+                            <SelectItem value={repo.name} key={repo.id}>
                               {repo.name}
                             </SelectItem>
                           ))
