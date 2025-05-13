@@ -330,14 +330,7 @@ const FileUploadRoot = React.forwardRef<HTMLDivElement, FileUploadRootProps>(
       value,
       defaultValue,
       onValueChange,
-      onAccept,
-      onFileAccept,
-      onFileReject,
-      onFileValidate,
-      onUpload,
       accept,
-      maxFiles,
-      maxSize,
       dir: dirProp,
       label,
       name,
@@ -870,8 +863,9 @@ const FileUploadList = React.forwardRef<HTMLDivElement, FileUploadListProps>(
 
     const context = useFileUploadContext(LIST_NAME);
 
-    const shouldRender =
-      forceMount || useStore((state) => state.files.size > 0);
+    const storeHasSize = useStore((state) => state.files.size > 0);
+
+    const shouldRender = forceMount || storeHasSize;
 
     if (!shouldRender) return null;
 
@@ -1402,7 +1396,9 @@ const FileUploadClear = React.forwardRef<
     [store, propsRef]
   );
 
-  const shouldRender = forceMount || useStore((state) => state.files.size > 0);
+  const storeHasSize = useStore((state) => state.files.size > 0)
+
+  const shouldRender = forceMount || storeHasSize;
 
   if (!shouldRender) return null;
 

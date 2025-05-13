@@ -42,7 +42,7 @@ const getMaskUrl = (variant: MaskedImageVariant): string => {
 
 export const MaskedImage: React.FC<
   MaskedImageProps & React.ImgHTMLAttributes<HTMLImageElement>
-> = ({ src, alt, width, height, variant = "random", className, ...rest }) => {
+> = ({ src, alt, variant = "random", className, ...rest }) => {
   const maskUrl = getMaskUrl(variant);
 
   return (

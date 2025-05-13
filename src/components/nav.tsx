@@ -15,7 +15,7 @@ const Nav = () => {
           src="/favicon.ico"
           alt="liangerwen's ☻ 微图床"
         />
-        liangerwen's ☻ 微图床
+        liangerwen&apos;s ☻ 微图床
       </Link>
     </nav>
   );
