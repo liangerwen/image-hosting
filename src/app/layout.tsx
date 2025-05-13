@@ -19,7 +19,7 @@ const ptSans = PT_Sans({
 export const metadata: Metadata = {
   title: "liangerwen's ☻ 微图床",
   description:
-    "liangerwen's ☻ 微图床，webp格式并压缩，免费、无广告、无需注册。",
+    "liangerwen's ☻ 微图床，免费、无广告、无需注册。",
 };
 
 export default function RootLayout({

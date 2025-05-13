@@ -134,7 +134,7 @@ export default function Home() {
                   点击、粘贴或拖动图片上传到图床
                 </p>
                 <p className="text-muted-foreground text-xs">
-                  支持单次或批量上传，图片将转换为webp格式并进行压缩！
+                  支持单次或批量上传！
                 </p>
               </>
             ) : (
@@ -182,7 +182,7 @@ export default function Home() {
                         onClick={() => window.open(URL.createObjectURL(file))}
                       />
                       <FileUploadItemMetadata />
-                      <Badge>压缩成功({formatBytes(22993242)})，等待上传</Badge>
+                      <Badge>等待上传...</Badge>
                       <FileUploadItemDelete asChild>
                         <Button variant="ghost" size="icon" className="size-7">
                           <X />
@@ -252,8 +252,7 @@ export default function Home() {
                             setProcessed(
                               processed.filter((f) => f.sha !== file.sha)
                             );
-                          } catch (e) {
-                            console.log(e);
+                          } catch {
                             toast.error("删除失败，请稍后再试");
                           }
                         }}

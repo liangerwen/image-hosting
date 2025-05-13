@@ -49,7 +49,7 @@ const formSchema = z.object({
 export type Config = z.infer<typeof formSchema>;
 
 const useConfigModal = (
-  initialValue: Config,
+  initialValue?: Config,
   {
     onSubmit,
   }: {
@@ -61,7 +61,7 @@ const useConfigModal = (
   const [loading, setLoading] = useState(false);
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: initialValue,
+    defaultValues: initialValue ?? {},
   });
 
   const getRepos = async () => {
